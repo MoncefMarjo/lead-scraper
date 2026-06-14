@@ -1,7 +1,7 @@
 """
 dm_hunter.py
 Step 2 — Decision-maker phone hunter
-Sources: Google Search, Company website, LinkedIn (public), Pages Jaunes
+Sources: Google Search, Company website, LinkedIn (public), Pages Jaunes, Google Maps
 Returns: list of phones with source, type, and raw confidence score
 """
 
@@ -16,8 +16,6 @@ from googlesearch import search
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
-# ── Constants ─────────────────────────────────────────────────────────────────
-
 HEADERS = {
     "User-Agent": (
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -26,24 +24,23 @@ HEADERS = {
     )
 }
 
-# French phone regex — matches 0X XX XX XX XX and +33 X XX XX XX XX
 PHONE_RE = re.compile(
     r"(?:(?:\+33|0033)\s?[1-9](?:[\s.\-]?\d{2}){4}|0[1-9](?:[\s.\-]?\d{2}){4})"
 )
 
-# Source weights for confidence scoring
 SOURCE_WEIGHTS = {
     "linkedin":        75,
     "website_team":    70,
     "website_contact": 55,
     "google_search":   55,
+    "google_maps":     40,
     "pages_jaunes":    35,
 }
+
 
 # ── Phone Utilities ───────────────────────────────────────────────────────────
 
 def normalize_phone(raw: str) -> str:
-    """Normalize any French phone to 0X XX XX XX XX format."""
     digits = re.sub(r"\D", "", raw)
     if digits.startswith("33") and len(digits) == 11:
         digits = "0" + digits[2:]
@@ -53,7 +50,6 @@ def normalize_phone(raw: str) -> str:
 
 
 def phone_type(normalized: str) -> str:
-    """Classify phone as Mobile, Fixe, or Special."""
     prefix = normalized.replace(" ", "")[:2]
     if prefix in ("06", "07"):
         return "Mobile"
@@ -65,7 +61,6 @@ def phone_type(normalized: str) -> str:
 
 
 def extract_phones(text: str) -> list:
-    """Extract and normalize all phones found in a text block."""
     found = PHONE_RE.findall(text)
     phones = []
     for raw in found:
@@ -76,7 +71,6 @@ def extract_phones(text: str) -> list:
 
 
 def safe_get(url: str, timeout: int = 8) -> str:
-    """Fetch a URL and return its text content, or empty string on failure."""
     try:
         resp = requests.get(url, headers=HEADERS, timeout=timeout)
         resp.raise_for_status()
@@ -87,17 +81,12 @@ def safe_get(url: str, timeout: int = 8) -> str:
 
 
 def random_delay():
-    """Polite random delay between requests."""
-    time.sleep(random.uniform(2.0, 4.5))
+    time.sleep(random.uniform(2.0, 4.0))
 
 
 # ── Source 1: Google Search ───────────────────────────────────────────────────
 
 def hunt_google(company: str, ceo: str, city: str = "") -> list:
-    """
-    Search Google for CEO + company + phone mentions.
-    Returns list of {phone, source, score} dicts.
-    """
     results = []
     queries = []
 
@@ -115,7 +104,6 @@ def hunt_google(company: str, ceo: str, city: str = "") -> list:
             random_delay()
 
             for url in urls:
-                # Skip LinkedIn here (handled separately)
                 if "linkedin.com" in url or url in seen_urls:
                     continue
                 seen_urls.add(url)
@@ -130,13 +118,10 @@ def hunt_google(company: str, ceo: str, city: str = "") -> list:
 
                 for phone in phones:
                     ptype = phone_type(phone)
-                    # Only keep mobile and fixe from Google Search
                     if ptype in ("Mobile", "Fixe"):
                         score = SOURCE_WEIGHTS["google_search"]
-                        # Bonus if mobile (more likely to be direct)
                         if ptype == "Mobile":
                             score += 10
-                        # Bonus if CEO name appears near the phone
                         if ceo and ceo != "N/A" and ceo.split()[0].lower() in text.lower():
                             score += 15
                         results.append({
@@ -158,17 +143,12 @@ def hunt_google(company: str, ceo: str, city: str = "") -> list:
 # ── Source 2: Company Website ─────────────────────────────────────────────────
 
 def hunt_website(website_url: str, ceo: str = "") -> list:
-    """
-    Scrape company website — specifically team/contact/about pages.
-    Returns list of {phone, source, score} dicts.
-    """
     if not website_url or website_url == "N/A":
         return []
 
     results = []
     base = website_url.rstrip("/")
 
-    # Pages most likely to have direct numbers
     target_paths = [
         "/equipe", "/direction", "/dirigeants",
         "/contact", "/nous-contacter", "/about", "/a-propos",
@@ -185,7 +165,6 @@ def hunt_website(website_url: str, ceo: str = "") -> list:
         text = soup.get_text(separator=" ")
         phones = extract_phones(text)
 
-        # Determine if this is a team page or contact page
         is_team_page = any(k in path for k in ["/equipe", "/direction", "/dirigeants", "/team", "/management"])
         source_key = "website_team" if is_team_page else "website_contact"
 
@@ -211,13 +190,9 @@ def hunt_website(website_url: str, ceo: str = "") -> list:
     return results
 
 
-# ── Source 3: LinkedIn (public pages only) ────────────────────────────────────
+# ── Source 3: LinkedIn ────────────────────────────────────────────────────────
 
 def hunt_linkedin(company: str, ceo: str, city: str = "") -> list:
-    """
-    Use Google to find LinkedIn pages, then scrape public content only.
-    Returns list of {phone, source, score} dicts.
-    """
     results = []
     queries = []
 
@@ -234,11 +209,9 @@ def hunt_linkedin(company: str, ceo: str, city: str = "") -> list:
             for url in urls:
                 if "linkedin.com" not in url:
                     continue
-
                 html = safe_get(url)
                 if not html:
                     continue
-
                 soup = BeautifulSoup(html, "lxml")
                 text = soup.get_text(separator=" ")
                 phones = extract_phones(text)
@@ -267,14 +240,52 @@ def hunt_linkedin(company: str, ceo: str, city: str = "") -> list:
     return results
 
 
-# ── Source 4: Pages Jaunes ────────────────────────────────────────────────────
+# ── Source 4: Google Maps (phone only) ───────────────────────────────────────
+
+def hunt_google_maps(company: str, city: str = "") -> list:
+    """
+    Search Google Maps via Google Search to find the phone number.
+    Does NOT scrape Maps directly — uses Google search results snippet.
+    """
+    results = []
+    query = f"{company} {city} site:maps.google.com OR maps téléphone"
+
+    try:
+        logger.info(f"Google Maps search: {company} {city}")
+        # Search Google for Maps listing
+        search_url = f"https://www.google.com/search?q={requests.utils.quote(company + ' ' + city + ' téléphone')}&hl=fr"
+        html = safe_get(search_url)
+        if not html:
+            return []
+
+        soup = BeautifulSoup(html, "lxml")
+        text = soup.get_text(separator=" ")
+        phones = extract_phones(text)
+
+        for phone in phones:
+            ptype = phone_type(phone)
+            if ptype in ("Mobile", "Fixe"):
+                score = SOURCE_WEIGHTS["google_maps"]
+                if ptype == "Mobile":
+                    score += 5
+                results.append({
+                    "phone": phone,
+                    "source": "Google Maps",
+                    "source_key": "google_maps",
+                    "type": ptype,
+                    "score": min(score, 99),
+                    "url": search_url,
+                })
+
+    except Exception as e:
+        logger.warning(f"Google Maps search failed for '{company}': {e}")
+
+    return results
+
+
+# ── Source 5: Pages Jaunes ────────────────────────────────────────────────────
 
 def hunt_pages_jaunes(company: str, city: str = "") -> list:
-    """
-    Scrape Pages Jaunes — low confidence, switchboard risk.
-    Only used as a last resort fallback.
-    Returns list of {phone, source, score} dicts.
-    """
     results = []
     query = f"{company} {city}".strip().replace(" ", "+")
     url = f"https://www.pagesjaunes.fr/pagesblanches/recherche?quoiqui={query}"
@@ -302,13 +313,9 @@ def hunt_pages_jaunes(company: str, city: str = "") -> list:
     return results
 
 
-# ── Cross-Source Reconciliation ───────────────────────────────────────────────
+# ── Reconciliation ────────────────────────────────────────────────────────────
 
 def reconcile(all_results: list) -> list:
-    """
-    Merge all phone results, deduplicate, and apply cross-source bonus.
-    Returns sorted list of unique phones with final confidence score.
-    """
     phone_map = {}
 
     for r in all_results:
@@ -328,7 +335,6 @@ def reconcile(all_results: list) -> list:
         entry["urls"].append(r["url"])
         entry["best_score"] = max(entry["best_score"], r["score"])
 
-    # Apply cross-source bonus
     final = []
     for phone, data in phone_map.items():
         score = data["best_score"]
@@ -342,7 +348,6 @@ def reconcile(all_results: list) -> list:
             "confidence": score,
         })
 
-    # Sort by confidence descending
     final.sort(key=lambda x: x["confidence"], reverse=True)
     return final
 
@@ -350,18 +355,6 @@ def reconcile(all_results: list) -> list:
 # ── Main Hunt Function ────────────────────────────────────────────────────────
 
 def hunt_dm_phones(company: str, ceo: str, city: str = "", website: str = "N/A") -> list:
-    """
-    Full decision-maker phone hunt across all sources.
-
-    Args:
-        company: Company name
-        ceo:     CEO/Gérant name from identity step
-        city:    City for search narrowing
-        website: Company website URL if known
-
-    Returns:
-        List of reconciled phone dicts sorted by confidence
-    """
     logger.info(f"🔍 Hunting phones for: {company} | CEO: {ceo}")
     all_results = []
 
@@ -372,13 +365,15 @@ def hunt_dm_phones(company: str, ceo: str, city: str = "", website: str = "N/A")
     if website and website != "N/A":
         all_results += hunt_website(website, ceo)
 
-    # Source 3: LinkedIn (public)
+    # Source 3: LinkedIn
     all_results += hunt_linkedin(company, ceo, city)
 
-    # Source 4: Pages Jaunes (fallback)
+    # Source 4: Google Maps (phone only)
+    all_results += hunt_google_maps(company, city)
+
+    # Source 5: Pages Jaunes (fallback)
     all_results += hunt_pages_jaunes(company, city)
 
-    # Reconcile and score
     final = reconcile(all_results)
 
     if final:
@@ -387,28 +382,3 @@ def hunt_dm_phones(company: str, ceo: str, city: str = "", website: str = "N/A")
         logger.warning(f"❌ No phones found for {company}")
 
     return final
-
-
-# ── Quick Test ────────────────────────────────────────────────────────────────
-
-if __name__ == "__main__":
-    test = {
-        "company": "Boulangerie Dupont",
-        "ceo": "PUTHET",
-        "city": "Lyon",
-        "website": "N/A",
-    }
-
-    print(f"\n=== DM PHONE HUNT TEST ===\n")
-    phones = hunt_dm_phones(
-        company=test["company"],
-        ceo=test["ceo"],
-        city=test["city"],
-        website=test["website"],
-    )
-
-    if phones:
-        for p in phones:
-            print(f"📞 {p['phone']} | {p['type']} | {p['confidence']}% | {p['sources']}")
-    else:
-        print("No phones found.")

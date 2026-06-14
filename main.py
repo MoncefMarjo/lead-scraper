@@ -98,19 +98,23 @@ def discover_and_process(
             website=identity.get("website", "N/A"),
         )
 
-        # Step 3 — Only keep leads WITH a phone
+        # Step 3 — Include ALL leads, phone or not
+        enriched.append({"identity": identity, "phones": phones})
+        if job:
+            job["enriched"] = len(enriched)
+
         if phones:
-            enriched.append({"identity": identity, "phones": phones})
             logger.info(f"✅ Phone found: {phones[0]['phone']} ({phones[0]['confidence']}%)")
             if job:
-                job["with_phone"] = len(enriched)
+                job["with_phone"] = len([e for e in enriched if e["phones"]])
         else:
-            logger.info(f"⚠️ No phone found — skipping")
+            logger.info(f"⚠️ No phone found — included with empty phone")
 
         if i < len(discovered):
             time.sleep(2)
 
-    logger.info(f"\n📊 {len(enriched)} leads with phone out of {len(discovered)} discovered")
+    with_phone = len([e for e in enriched if e["phones"]])
+    logger.info(f"\n📊 {len(enriched)} total leads | {with_phone} with phone")
 
     # Step 4 — Export
     path = export_to_excel(enriched, output_path)
