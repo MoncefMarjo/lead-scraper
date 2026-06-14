@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>B2B Lead Scraper</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Inter, sans-serif; background: #0f172a; color: #e2e8f0; padding: 24px; min-height: 100vh; }
+    h1 { color: #38bdf8; font-size: 22px; margin-bottom: 4px; }
+    p.sub { color: #64748b; font-size: 13px; margin-bottom: 24px; }
+    .tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+    .tab { padding: 8px 20px; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; }
+    .tab.active { background: #38bdf8; color: #0f172a; font-weight: 700; }
+    .tab:not(.active) { background: #1e293b; color: #94a3b8; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .card { background: #1e293b; border-radius: 12px; padding: 20px; }
+    label { display: block; font-size: 12px; color: #64748b; margin-bottom: 6px; margin-top: 14px; }
+    input, textarea { width: 100%; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 9px 12px; color: #e2e8f0; font-size: 13px; outline: none; }
+    textarea { height: 180px; resize: vertical; font-family: monospace; font-size: 12px; }
+    .btn { padding: 10px 24px; border-radius: 8px; border: none; cursor: pointer; font-size: 13px; font-weight: 600; }
+    .btn-primary { background: linear-gradient(135deg, #38bdf8, #0ea5e9); color: #0f172a; }
+    .btn-danger { background: #ef4444; color: #fff; }
+    .btn-success { background: #22c55e; color: #fff; }
+    .btn-row { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+    .progress-bar-bg { background: #0f172a; border-radius: 8px; height: 20px; overflow: hidden; margin-bottom: 8px; }
+    .progress-bar { height: 100%; background: linear-gradient(90deg, #38bdf8, #22c55e); transition: width 0.5s; border-radius: 8px; width: 0%; }
+    .log-box { background: #0f172a; border-radius: 8px; padding: 12px; height: 280px; overflow-y: auto; font-family: monospace; font-size: 12px; color: #94a3b8; margin-top: 12px; }
+    .log-ok { color: #22c55e; }
+    .log-err { color: #ef4444; }
+    .log-info { color: #38bdf8; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th { padding: 8px 10px; text-align: left; color: #38bdf8; font-weight: 600; border-bottom: 1px solid #334155; }
+    td { padding: 7px 10px; color: #cbd5e1; border-bottom: 1px solid #1e293b; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    tr:nth-child(even) { background: #162032; }
+    .status-text { color: #94a3b8; font-size: 13px; margin-bottom: 16px; }
+    .error-box { background: #450a0a; border: 1px solid #ef4444; border-radius: 8px; padding: 12px; color: #fca5a5; font-size: 13px; margin-bottom: 12px; display: none; }
+    .span2 { grid-column: span 2; }
+    .hdr { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .hdr h2 { font-size: 14px; color: #94a3b8; font-weight: 600; margin: 0; }
+  </style>
+</head>
+<body>
+  <h1>&#9889; B2B Lead Scraper &mdash; Energy France</h1>
+  <p class="sub">Collect qualified leads with SIRET, SIREN, NAF and energy switch intent signals</p>
+
+  <div class="tabs">
+    <button class="tab active" id="tab-btn-config" onclick="showTab('config')">&#9881;&#65039; Configuration</button>
+    <button class="tab" id="tab-btn-progress" onclick="showTab('progress')">&#128225; Progress</button>
+    <button class="tab" id="tab-btn-results" onclick="showTab('results')">&#128202; Results</button>
+  </div>
+
+  <!-- CONFIG -->
+  <div id="tab-config" class="panel active">
+    <div class="grid">
+      <div class="card">
+        <h2 style="font-size:14px;color:#94a3b8;font-weight:600;">&#127919; Search Parameters</h2>
+        <label>Sector / Business Type</label>
+        <input id="sector" value="Garages auto" />
+        <label>Main Region</label>
+        <input id="region" value="Ile-de-France" />
+        <label>Lead Target (number)</label>
+        <input id="target" type="number" value="50" min="10" max="2000" />
+      </div>
+      <div class="card">
+        <h2 style="font-size:14px;color:#94a3b8;font-weight:600;">&#128205; Zones to cover (one per line)</h2>
+        <textarea id="zones">Paris 75001
+Paris 75008
+Paris 75017
+Lyon
+Marseille
+Bordeaux
+Toulouse
+Nantes
+Lille</textarea>
+        <p style="color:#475569;font-size:11px;margin-top:4px;">e.g. Paris 75008, Lyon, Marseille 13001...</p>
+      </div>
+      <div class="card span2 btn-row">
+        <button class="btn btn-primary" onclick="startScraping()">&#128640; Start Scraping</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROGRESS -->
+  <div id="tab-progress" class="panel">
+    <div class="card">
+      <div class="hdr">
+        <h2>&#128225; Real-time Status</h2>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-danger" id="btn-stop" style="display:none" onclick="stopScraping()">&#9209; Stop</button>
+          <button class="btn btn-success" id="btn-export-prog" style="display:none" onclick="exportExcel()">&#128229; Export Excel</button>
+        </div>
+      </div>
+      <div class="progress-bar-bg"><div class="progress-bar" id="prog-bar"></div></div>
+      <p class="status-text" id="prog-text">Waiting to start...</p>
+      <div id="error-box" class="error-box"></div>
+      <div class="log-box" id="log-box"><div style="color:#475569">Waiting for logs...</div></div>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="tab-results" class="panel">
+    <div class="card">
+      <div class="hdr">
+        <h2 id="results-title">&#128202; 0 leads collected</h2>
+        <button class="btn btn-success" onclick="exportExcel()">&#128229; Export Excel</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead><tr>
+            <th>Name</th><th>Phone</th><th>SIRET</th><th>NAF</th><th>CEO</th><th>Energy Signals</th><th>Zone</th>
+          </tr></thead>
+          <tbody id="results-body">
+            <tr><td colspan="7" style="color:#475569;padding:20px;">No results yet. Start scraping first.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const API = 'http://localhost:8000';
+  let polling = null;
+
+  function showTab(name) {
+    document.querySelectorAll('.panel').forEach(function(p) { p.classList.remove('active'); });
+    document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
+    document.getElementById('tab-' + name).classList.add('active');
+    document.getElementById('tab-btn-' + name).classList.add('active');
+  }
+
+  async function startScraping() {
+    var sector = document.getElementById('sector').value;
+    var region = document.getElementById('region').value;
+    var target = parseInt(document.getElementById('target').value);
+    var zones = document.getElementById('zones').value.split('\n').map(function(z){ return z.trim(); }).filter(Boolean);
+
+    try {
+      var res = await fetch(API + '/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sector: sector, region: region, target: target, zones: zones })
+      });
+      var data = await res.json();
+      if (data.error) { alert(data.error); return; }
+      document.getElementById('btn-stop').style.display = 'inline-block';
+      document.getElementById('btn-export-prog').style.display = 'none';
+      showTab('progress');
+      startPolling();
+    } catch(e) {
+      alert('Cannot reach backend!\nMake sure main.py is running.\n\nError: ' + e);
+    }
+  }
+
+  function startPolling() {
+    if (polling) clearInterval(polling);
+    polling = setInterval(async function() {
+      try {
+        var res = await fetch(API + '/status');
+        var data = await res.json();
+        updateProgress(data);
+        if (data.done || !data.running) {
+          clearInterval(polling);
+          document.getElementById('btn-stop').style.display = 'none';
+          document.getElementById('btn-export-prog').style.display = 'inline-block';
+          loadResults();
+        }
+      } catch(e) {
+        document.getElementById('error-box').style.display = 'block';
+        document.getElementById('error-box').innerText = 'Cannot reach backend. Is main.py still running?';
+        clearInterval(polling);
+      }
+    }, 2000);
+  }
+
+  function updateProgress(data) {
+    var pct = data.total ? Math.round((data.progress / data.total) * 100) : 0;
+    document.getElementById('prog-bar').style.width = pct + '%';
+    var txt = (data.progress || 0) + ' / ' + (data.total || 0) + ' leads (' + pct + '%)';
+    if (data.done) txt += ' - DONE!';
+    else if (data.running) txt += ' - Running...';
+    document.getElementById('prog-text').innerText = txt;
+    var logBox = document.getElementById('log-box');
+    if (data.log && data.log.length) {
+      logBox.innerHTML = data.log.map(function(l) {
+        var cls = l.indexOf('OK') >= 0 ? 'log-ok' : l.indexOf('Fatal') >= 0 || l.indexOf('Error') >= 0 ? 'log-err' : l.indexOf('Scanning') >= 0 ? 'log-info' : '';
+        return '<div class="' + cls + '">' + l + '</div>';
+      }).join('');
+      logBox.scrollTop = logBox.scrollHeight;
+    }
+    if (data.error) {
+      document.getElementById('error-box').style.display = 'block';
+      document.getElementById('error-box').innerText = data.error;
+    }
+  }
+
+  async function loadResults() {
+    var res = await fetch(API + '/results');
+    var data = await res.json();
+    var rows = data.results || [];
+    document.getElementById('results-title').innerText = rows.length + ' leads collected';
+    var tbody = document.getElementById('results-body');
+    if (!rows.length) {
+      tbody.innerHTML = '<tr><td colspan="7" style="color:#475569">No results.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = rows.map(function(r) {
+      return '<tr><td>' + (r['Nom']||'') + '</td><td>' + (r['Telephone Principal']||'') + '</td><td style="font-family:monospace">' + (r['SIRET']||'') + '</td><td>' + (r['Code NAF']||'') + '</td><td>' + (r['CEO Dirigeant']||'') + '</td><td>' + (r['Signaux Intention Energie']||'') + '</td><td>' + (r['Zone']||'') + '</td></tr>';
+    }).join('');
+  }
+
+  async function stopScraping() {
+    await fetch(API + '/stop', { method: 'POST' });
+    if (polling) clearInterval(polling);
+    document.getElementById('btn-stop').style.display = 'none';
+  }
+
+  function exportExcel() {
+    window.open(API + '/export', '_blank');
+  }
+</script>
+</body>
+</html>
