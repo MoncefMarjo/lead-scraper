@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List
-from main import process_leads
+from main import process_leads, discover_and_process
 
 app = FastAPI(title="B2B Lead Scraper")
 
@@ -37,6 +37,12 @@ class LeadList(BaseModel):
     leads: List[Lead]
 
 
+class DiscoverRequest(BaseModel):
+    naf_code: str
+    postal_codes: List[str]
+    target: int = 500
+
+
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse)
@@ -47,7 +53,6 @@ def root():
 
 @app.post("/scrape")
 def scrape(data: LeadList):
-    """Start a scraping job from manual lead list."""
     job_id = str(uuid.uuid4())
     leads = [{"name": l.name, "city": l.city} for l in data.leads]
     jobs[job_id] = {"status": "running", "progress": 0, "total": len(leads), "file": None}
@@ -68,7 +73,6 @@ def scrape(data: LeadList):
 
 @app.post("/scrape-csv")
 async def scrape_csv(file: UploadFile = File(...)):
-    """Start a scraping job from uploaded CSV file."""
     contents = await file.read()
     decoded = contents.decode("utf-8-sig")
     reader = csv.DictReader(io.StringIO(decoded))
@@ -81,7 +85,7 @@ async def scrape_csv(file: UploadFile = File(...)):
             leads.append({"name": name.strip(), "city": city.strip()})
 
     if not leads:
-        raise HTTPException(status_code=400, detail="No valid leads found in CSV. Make sure it has a 'name' column.")
+        raise HTTPException(status_code=400, detail="No valid leads found in CSV.")
 
     job_id = str(uuid.uuid4())
     jobs[job_id] = {"status": "running", "progress": 0, "total": len(leads), "file": None}
@@ -100,9 +104,40 @@ async def scrape_csv(file: UploadFile = File(...)):
     return {"job_id": job_id}
 
 
+@app.post("/discover")
+def discover(data: DiscoverRequest):
+    job_id = str(uuid.uuid4())
+    jobs[job_id] = {
+        "status": "running",
+        "stage": "discovery",
+        "progress": 0,
+        "total": 0,
+        "discovered": 0,
+        "with_phone": 0,
+        "current": "",
+        "file": None,
+    }
+
+    def run():
+        try:
+            output_path = f"output_{job_id}.xlsx"
+            discover_and_process(
+                naf_code=data.naf_code,
+                postal_codes=data.postal_codes,
+                target=data.target,
+                output_path=output_path,
+                job=jobs[job_id],
+            )
+        except Exception as e:
+            jobs[job_id]["status"] = "error"
+            jobs[job_id]["error"] = str(e)
+
+    threading.Thread(target=run).start()
+    return {"job_id": job_id}
+
+
 @app.get("/status/{job_id}")
 def status(job_id: str):
-    """Check job status."""
     job = jobs.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
@@ -111,7 +146,6 @@ def status(job_id: str):
 
 @app.get("/download/{job_id}")
 def download(job_id: str):
-    """Download the Excel file for a completed job."""
     job = jobs.get(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")

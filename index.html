@@ -12,45 +12,52 @@
     header p { font-size: 13px; color: #94a3b8; margin-top: 4px; }
     .container { max-width: 800px; margin: 40px auto; padding: 0 20px; }
     .tabs { display: flex; gap: 8px; margin-bottom: 24px; }
-    .tab { padding: 10px 24px; border-radius: 8px; cursor: pointer; font-size: 14px; font-weight: 600; border: none; transition: all 0.2s; }
+    .tab { padding: 10px 20px; border-radius: 8px; cursor: pointer; font-size: 13px; font-weight: 600; border: none; transition: all 0.2s; }
     .tab.active { background: #38bdf8; color: #0f172a; }
     .tab:not(.active) { background: #1e293b; color: #94a3b8; }
     .panel { display: none; }
     .panel.active { display: block; }
     .card { background: #1e293b; border-radius: 12px; padding: 24px; border: 1px solid #334155; margin-bottom: 16px; }
     label { font-size: 13px; color: #94a3b8; display: block; margin-bottom: 6px; }
-    input[type=text] { width: 100%; padding: 10px 14px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #e2e8f0; font-size: 14px; outline: none; }
-    input[type=text]:focus { border-color: #38bdf8; }
-    .row { display: flex; gap: 12px; margin-bottom: 12px; }
-    .row input { flex: 1; }
+    input[type=text], input[type=number] { width: 100%; padding: 10px 14px; background: #0f172a; border: 1px solid #334155; border-radius: 8px; color: #e2e8f0; font-size: 14px; outline: none; margin-bottom: 12px; }
+    input[type=text]:focus, input[type=number]:focus { border-color: #38bdf8; }
+    .row { display: flex; gap: 12px; }
+    .row input { flex: 1; margin-bottom: 0; }
     .btn { padding: 10px 20px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; font-weight: 600; transition: all 0.2s; }
     .btn-primary { background: #38bdf8; color: #0f172a; }
     .btn-primary:hover { background: #7dd3fc; }
     .btn-secondary { background: #334155; color: #e2e8f0; }
     .btn-secondary:hover { background: #475569; }
     .btn-danger { background: #ef4444; color: white; padding: 6px 12px; font-size: 12px; }
+    .btn-full { width: 100%; padding: 14px; font-size: 15px; margin-top: 8px; }
     .leads-list { margin-bottom: 16px; }
     .lead-item { display: flex; align-items: center; gap: 8px; background: #0f172a; border-radius: 8px; padding: 10px 14px; margin-bottom: 8px; font-size: 13px; }
     .lead-item span { flex: 1; }
     .upload-area { border: 2px dashed #334155; border-radius: 12px; padding: 40px; text-align: center; cursor: pointer; transition: all 0.2s; }
     .upload-area:hover { border-color: #38bdf8; }
     .upload-area p { color: #94a3b8; font-size: 14px; margin-top: 8px; }
-    .upload-area .icon { font-size: 32px; }
     input[type=file] { display: none; }
     .progress-wrap { margin-top: 24px; display: none; }
     .progress-bar-bg { background: #0f172a; border-radius: 99px; height: 8px; overflow: hidden; margin: 12px 0; }
     .progress-bar { height: 100%; background: #38bdf8; border-radius: 99px; transition: width 0.4s; width: 0%; }
     .status-text { font-size: 13px; color: #94a3b8; }
+    .status-detail { font-size: 12px; color: #64748b; margin-top: 4px; }
+    .stats-row { display: flex; gap: 16px; margin-top: 12px; }
+    .stat { background: #0f172a; border-radius: 8px; padding: 10px 16px; flex: 1; text-align: center; }
+    .stat .val { font-size: 22px; font-weight: 700; color: #38bdf8; }
+    .stat .lbl { font-size: 11px; color: #64748b; margin-top: 2px; }
     .download-btn { display: none; width: 100%; margin-top: 16px; padding: 14px; font-size: 16px; background: #22c55e; color: white; border-radius: 10px; border: none; cursor: pointer; font-weight: 700; }
     .download-btn:hover { background: #16a34a; }
-    .csv-hint { font-size: 12px; color: #64748b; margin-top: 8px; }
+    .hint { font-size: 12px; color: #64748b; margin-top: 6px; }
+    .tag { display: inline-block; background: #334155; border-radius: 6px; padding: 4px 10px; font-size: 12px; margin: 3px; cursor: pointer; }
+    .tag:hover { background: #475569; }
   </style>
 </head>
 <body>
 
 <header>
   <h1>🔍 B2B Lead Scraper</h1>
-  <p>Enrichissement automatique de leads — SIREN · CEO · Téléphone · Confiance</p>
+  <p>Enrichissement automatique — SIREN · CEO · Téléphone · Score de confiance</p>
 </header>
 
 <div class="container">
@@ -58,55 +65,76 @@
   <div class="tabs">
     <button class="tab active" onclick="switchTab('manual')">✏️ Saisie manuelle</button>
     <button class="tab" onclick="switchTab('csv')">📂 Import CSV</button>
+    <button class="tab" onclick="switchTab('auto')">🤖 Auto Discovery</button>
   </div>
 
   <!-- Manual Tab -->
   <div class="panel active" id="panel-manual">
     <div class="card">
       <label>Ajouter une entreprise</label>
-      <div class="row">
-        <input type="text" id="inp-name" placeholder="Nom de l'entreprise" />
-        <input type="text" id="inp-city" placeholder="Ville (optionnel)" />
+      <div class="row" style="margin-bottom:12px;">
+        <input type="text" id="inp-name" placeholder="Nom de l'entreprise" style="margin-bottom:0;" />
+        <input type="text" id="inp-city" placeholder="Ville (optionnel)" style="margin-bottom:0;" />
       </div>
       <button class="btn btn-secondary" onclick="addLead()">+ Ajouter</button>
     </div>
-
     <div class="leads-list" id="leads-list"></div>
-
-    <button class="btn btn-primary" style="width:100%;padding:14px;font-size:15px;" onclick="startManual()">
-      🚀 Lancer le scraping
-    </button>
+    <button class="btn btn-primary btn-full" onclick="startManual()">🚀 Lancer le scraping</button>
   </div>
 
   <!-- CSV Tab -->
   <div class="panel" id="panel-csv">
     <div class="card">
       <div class="upload-area" onclick="document.getElementById('csv-file').click()">
-        <div class="icon">📄</div>
+        <div style="font-size:32px;">📄</div>
         <p><strong>Cliquez pour importer un fichier CSV</strong></p>
         <p>Colonnes requises : <code>name</code> et <code>city</code> (optionnel)</p>
       </div>
       <input type="file" id="csv-file" accept=".csv" onchange="handleCSV(this)" />
-      <p class="csv-hint">Exemple CSV : name,city → "Kandbaz,Paris"</p>
+      <p class="hint">Exemple : name,city → "Kandbaz,Paris"</p>
     </div>
-    <div id="csv-preview" style="margin-bottom:16px;"></div>
-    <button class="btn btn-primary" style="width:100%;padding:14px;font-size:15px;" onclick="startCSV()">
-      🚀 Lancer le scraping
-    </button>
+    <div id="csv-preview"></div>
+    <button class="btn btn-primary btn-full" onclick="startCSV()">🚀 Lancer le scraping</button>
   </div>
 
-  <!-- Progress -->
+  <!-- Auto Discovery Tab -->
+  <div class="panel" id="panel-auto">
+    <div class="card">
+      <label>Code NAF / APE</label>
+      <input type="text" id="inp-naf" placeholder="Ex: 45.20A (Entretien et réparation de véhicules)" />
+      <p class="hint">Exemples rapides :
+        <span class="tag" onclick="setNaf('45.20A')">45.20A Garage</span>
+        <span class="tag" onclick="setNaf('43.22A')">43.22A Plomberie</span>
+        <span class="tag" onclick="setNaf('56.10A')">56.10A Restaurant</span>
+        <span class="tag" onclick="setNaf('47.41Z')">47.41Z Informatique</span>
+        <span class="tag" onclick="setNaf('86.21Z')">86.21Z Médecin</span>
+      </p>
+
+      <label style="margin-top:16px;">Codes Postaux <span style="color:#64748b;">(séparés par des virgules)</span></label>
+      <input type="text" id="inp-postal" placeholder="Ex: 75001, 75002, 75003, 13001, 13002" />
+
+      <label style="margin-top:8px;">Objectif de leads</label>
+      <input type="number" id="inp-target" value="500" min="10" max="500" />
+      <p class="hint">⚠️ Plus l'objectif est élevé, plus le scraping prend du temps (environ 1 min par lead).</p>
+    </div>
+    <button class="btn btn-primary btn-full" onclick="startDiscover()">🤖 Lancer la découverte automatique</button>
+  </div>
+
+  <!-- Progress Section (shared) -->
   <div class="progress-wrap" id="progress-wrap">
     <div class="card">
       <div class="status-text" id="status-text">Initialisation...</div>
       <div class="progress-bar-bg">
         <div class="progress-bar" id="progress-bar"></div>
       </div>
-      <div class="status-text" id="status-detail"></div>
+      <div class="status-detail" id="status-detail"></div>
+      <div class="stats-row" id="stats-row" style="display:none;">
+        <div class="stat"><div class="val" id="stat-discovered">0</div><div class="lbl">Découvertes</div></div>
+        <div class="stat"><div class="val" id="stat-enriched">0</div><div class="lbl">Enrichies</div></div>
+        <div class="stat"><div class="val" id="stat-phone">0</div><div class="lbl">Avec téléphone</div></div>
+      </div>
     </div>
-    <button class="download-btn" id="download-btn" onclick="downloadFile()">
-      ⬇️ Télécharger Excel
-    </button>
+    <button class="download-btn" id="download-btn" onclick="downloadFile()">⬇️ Télécharger Excel</button>
   </div>
 
 </div>
@@ -119,46 +147,44 @@
 
   function switchTab(tab) {
     document.querySelectorAll('.tab').forEach((t, i) => {
-      t.classList.toggle('active', (i === 0 && tab === 'manual') || (i === 1 && tab === 'csv'));
+      t.classList.toggle('active', (i===0&&tab==='manual')||(i===1&&tab==='csv')||(i===2&&tab==='auto'));
     });
-    document.getElementById('panel-manual').classList.toggle('active', tab === 'manual');
-    document.getElementById('panel-csv').classList.toggle('active', tab === 'csv');
+    ['manual','csv','auto'].forEach(id => {
+      document.getElementById('panel-'+id).classList.toggle('active', id===tab);
+    });
   }
+
+  function setNaf(code) { document.getElementById('inp-naf').value = code; }
 
   function addLead() {
     const name = document.getElementById('inp-name').value.trim();
     const city = document.getElementById('inp-city').value.trim();
-    if (!name) return alert('Entrez un nom d\'entreprise.');
+    if (!name) return alert('Entrez un nom.');
     leads.push({ name, city });
     renderLeads();
     document.getElementById('inp-name').value = '';
     document.getElementById('inp-city').value = '';
   }
 
-  function removeLead(i) {
-    leads.splice(i, 1);
-    renderLeads();
-  }
+  function removeLead(i) { leads.splice(i, 1); renderLeads(); }
 
   function renderLeads() {
-    const el = document.getElementById('leads-list');
-    el.innerHTML = leads.map((l, i) => `
+    document.getElementById('leads-list').innerHTML = leads.map((l, i) => `
       <div class="lead-item">
-        <span>🏢 <strong>${l.name}</strong>${l.city ? ' — ' + l.city : ''}</span>
+        <span>🏢 <strong>${l.name}</strong>${l.city?' — '+l.city:''}</span>
         <button class="btn btn-danger" onclick="removeLead(${i})">✕</button>
-      </div>
-    `).join('');
+      </div>`).join('');
   }
 
   function handleCSV(input) {
     csvFile = input.files[0];
     const reader = new FileReader();
     reader.onload = e => {
-      const lines = e.target.result.split('\n').filter(l => l.trim()).slice(0, 6);
+      const lines = e.target.result.split('\n').filter(l=>l.trim()).slice(0,6);
       document.getElementById('csv-preview').innerHTML = `
         <div class="card" style="font-size:13px;color:#94a3b8;">
-          <strong style="color:#38bdf8;">Aperçu (${lines.length - 1} premières lignes)</strong><br><br>
-          ${lines.map(l => `<div style="font-family:monospace;">${l}</div>`).join('')}
+          <strong style="color:#38bdf8;">Aperçu</strong><br><br>
+          ${lines.map(l=>`<div style="font-family:monospace;">${l}</div>`).join('')}
         </div>`;
     };
     reader.readAsText(csvFile);
@@ -166,11 +192,11 @@
 
   async function startManual() {
     if (!leads.length) return alert('Ajoutez au moins une entreprise.');
-    showProgress();
+    showProgress(false);
     const res = await fetch('/scrape', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ leads })
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({leads})
     });
     const data = await res.json();
     currentJobId = data.job_id;
@@ -179,21 +205,40 @@
 
   async function startCSV() {
     if (!csvFile) return alert('Importez un fichier CSV.');
-    showProgress();
+    showProgress(false);
     const formData = new FormData();
     formData.append('file', csvFile);
-    const res = await fetch('/scrape-csv', { method: 'POST', body: formData });
+    const res = await fetch('/scrape-csv', {method:'POST', body:formData});
     const data = await res.json();
     currentJobId = data.job_id;
     pollStatus();
   }
 
-  function showProgress() {
+  async function startDiscover() {
+    const naf = document.getElementById('inp-naf').value.trim();
+    const postalRaw = document.getElementById('inp-postal').value.trim();
+    const target = parseInt(document.getElementById('inp-target').value) || 500;
+    if (!naf) return alert('Entrez un code NAF.');
+    if (!postalRaw) return alert('Entrez au moins un code postal.');
+    const postal_codes = postalRaw.split(',').map(p=>p.trim()).filter(Boolean);
+    showProgress(true);
+    const res = await fetch('/discover', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({naf_code: naf, postal_codes, target})
+    });
+    const data = await res.json();
+    currentJobId = data.job_id;
+    pollStatus();
+  }
+
+  function showProgress(isAuto) {
     document.getElementById('progress-wrap').style.display = 'block';
     document.getElementById('download-btn').style.display = 'none';
     document.getElementById('progress-bar').style.width = '0%';
     document.getElementById('status-text').textContent = 'Démarrage...';
     document.getElementById('status-detail').textContent = '';
+    document.getElementById('stats-row').style.display = isAuto ? 'flex' : 'none';
   }
 
   function pollStatus() {
@@ -202,12 +247,24 @@
       const job = await res.json();
 
       if (job.status === 'running') {
-        document.getElementById('status-text').textContent = `⏳ Traitement en cours...`;
-        document.getElementById('progress-bar').style.width = '60%';
+        const stage = job.stage || 'enrichment';
+        if (stage === 'discovery') {
+          document.getElementById('status-text').textContent = '🔍 Découverte des entreprises...';
+          document.getElementById('progress-bar').style.width = '20%';
+        } else {
+          const pct = job.total > 0 ? Math.round((job.progress / job.total) * 70) + 20 : 30;
+          document.getElementById('progress-bar').style.width = pct + '%';
+          document.getElementById('status-text').textContent = `⚙️ Enrichissement en cours... (${job.progress||0}/${job.total||'?'})`;
+          document.getElementById('status-detail').textContent = job.current ? `Traitement: ${job.current}` : '';
+          document.getElementById('stat-discovered').textContent = job.discovered || 0;
+          document.getElementById('stat-enriched').textContent = job.progress || 0;
+          document.getElementById('stat-phone').textContent = job.with_phone || 0;
+        }
       } else if (job.status === 'done') {
         clearInterval(pollInterval);
-        document.getElementById('status-text').textContent = '✅ Scraping terminé !';
+        document.getElementById('status-text').textContent = `✅ Terminé ! ${job.final_count || ''} leads avec téléphone exportés.`;
         document.getElementById('progress-bar').style.width = '100%';
+        document.getElementById('stat-phone').textContent = job.final_count || job.with_phone || 0;
         document.getElementById('download-btn').style.display = 'block';
       } else if (job.status === 'error') {
         clearInterval(pollInterval);
@@ -216,9 +273,7 @@
     }, 3000);
   }
 
-  function downloadFile() {
-    window.location.href = `/download/${currentJobId}`;
-  }
+  function downloadFile() { window.location.href = `/download/${currentJobId}`; }
 </script>
 
 </body>
