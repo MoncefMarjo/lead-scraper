@@ -1,17 +1,20 @@
 """
 dm_hunter.py
 Step 2 — Decision-maker phone hunter
-Sources: Google Search, Company website, LinkedIn (public), Pages Jaunes, Google Maps
-Returns: list of phones with source, type, and raw confidence score
+Sources: Google Search, Company website, LinkedIn, Google Maps (Selenium)
 """
 
 import re
 import time
 import random
 import logging
+import urllib.parse
 import requests
 from bs4 import BeautifulSoup
 from googlesearch import search
+from selenium import webdriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.service import Service
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -33,7 +36,7 @@ SOURCE_WEIGHTS = {
     "website_team":    70,
     "website_contact": 55,
     "google_search":   55,
-    "google_maps":     40,
+    "google_maps":     45,
     "pages_jaunes":    35,
 }
 
@@ -148,7 +151,6 @@ def hunt_website(website_url: str, ceo: str = "") -> list:
 
     results = []
     base = website_url.rstrip("/")
-
     target_paths = [
         "/equipe", "/direction", "/dirigeants",
         "/contact", "/nous-contacter", "/about", "/a-propos",
@@ -240,45 +242,53 @@ def hunt_linkedin(company: str, ceo: str, city: str = "") -> list:
     return results
 
 
-# ── Source 4: Google Maps (phone only) ───────────────────────────────────────
+# ── Source 4: Google Maps via Selenium ───────────────────────────────────────
 
-def hunt_google_maps(company: str, city: str = "") -> list:
-    """
-    Search Google Maps via Google Search to find the phone number.
-    Does NOT scrape Maps directly — uses Google search results snippet.
-    """
+def hunt_maps_selenium(company: str, city: str = "") -> list:
+    """Extract phone directly from Google Maps using Selenium."""
     results = []
-    query = f"{company} {city} site:maps.google.com OR maps téléphone"
+    query = urllib.parse.quote_plus(f"{company} {city}")
+    url = f"https://www.google.com/maps/search/{query}"
+
+    options = webdriver.ChromeOptions()
+    options.add_argument("--headless")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--lang=fr")
 
     try:
-        logger.info(f"Google Maps search: {company} {city}")
-        # Search Google for Maps listing
-        search_url = f"https://www.google.com/search?q={requests.utils.quote(company + ' ' + city + ' téléphone')}&hl=fr"
-        html = safe_get(search_url)
-        if not html:
-            return []
+        driver = webdriver.Chrome(
+            service=Service("chromedriver.exe"),
+            options=options
+        )
+        driver.set_page_load_timeout(15)
+        driver.get(url)
+        time.sleep(3)
 
-        soup = BeautifulSoup(html, "lxml")
-        text = soup.get_text(separator=" ")
-        phones = extract_phones(text)
+        page_text = driver.find_element(By.TAG_NAME, "body").text
+        phones_found = extract_phones(page_text)
 
-        for phone in phones:
-            ptype = phone_type(phone)
-            if ptype in ("Mobile", "Fixe"):
-                score = SOURCE_WEIGHTS["google_maps"]
-                if ptype == "Mobile":
-                    score += 5
+        for ph in phones_found:
+            norm = normalize_phone(ph)
+            if norm:
+                ptype = phone_type(norm)
                 results.append({
-                    "phone": phone,
+                    "phone": norm,
                     "source": "Google Maps",
                     "source_key": "google_maps",
                     "type": ptype,
-                    "score": min(score, 99),
-                    "url": search_url,
+                    "score": SOURCE_WEIGHTS["google_maps"],
+                    "url": url,
                 })
+                logger.info(f"📍 Maps phone found: {norm}")
+
+        if not phones_found:
+            logger.warning(f"No phone on Maps for: {company}")
+
+        driver.quit()
 
     except Exception as e:
-        logger.warning(f"Google Maps search failed for '{company}': {e}")
+        logger.warning(f"Selenium Maps failed for {company}: {e}")
 
     return results
 
@@ -368,8 +378,8 @@ def hunt_dm_phones(company: str, ceo: str, city: str = "", website: str = "N/A")
     # Source 3: LinkedIn
     all_results += hunt_linkedin(company, ceo, city)
 
-    # Source 4: Google Maps (phone only)
-    all_results += hunt_google_maps(company, city)
+    # Source 4: Google Maps via Selenium
+    all_results += hunt_maps_selenium(company, city)
 
     # Source 5: Pages Jaunes (fallback)
     all_results += hunt_pages_jaunes(company, city)
