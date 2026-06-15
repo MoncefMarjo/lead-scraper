@@ -12,9 +12,13 @@ import urllib.parse
 import requests
 from bs4 import BeautifulSoup
 from googlesearch import search
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.service import Service
+try:
+    from selenium import webdriver
+    from selenium.webdriver.common.by import By
+    from selenium.webdriver.chrome.service import Service
+    SELENIUM_AVAILABLE = True
+except ImportError:
+    SELENIUM_AVAILABLE = False
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -247,6 +251,9 @@ def hunt_linkedin(company: str, ceo: str, city: str = "") -> list:
 def hunt_maps_selenium(company: str, city: str = "") -> list:
     """Extract phone directly from Google Maps using Selenium."""
     results = []
+    if not SELENIUM_AVAILABLE:
+        logger.warning("Selenium not available — skipping Maps hunt")
+        return []
     query = urllib.parse.quote_plus(f"{company} {city}")
     url = f"https://www.google.com/maps/search/{query}"
 
